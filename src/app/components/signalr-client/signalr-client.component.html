@@ -1,0 +1,36 @@
+<div ng-if="info" style="color: red">{{info}}</div>
+<div class="container">
+    <div class="row"> </div>
+    <div class="row">
+        <div class="col-md-12">
+            <div class="col-md-6">
+                <div class="col-md-3">User</div>
+                <div class="col-md-9">
+                  <input [(ngModel)]="userName">
+                </div>
+            </div>
+        </div>
+        <div class="col-md-12">
+            <div class="col-md-6">
+                <div class="col-md-3">Message</div>
+                <div class="col-md-9">
+                    <input [(ngModel)]="message">
+                    <button (click)="sendMessage()">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-12">
+            <hr />
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-6"> </div>
+        <div class="col-6">
+            <ul *ngFor="let msg of messagesList let i = index">
+              <li>{{i + 1}} - {{msg}}</li>
+            </ul>
+        </div>
+    </div>
+</div>
