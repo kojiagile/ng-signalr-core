@@ -53,8 +53,16 @@ export class SignalrService {
     // As a best practice, call connection.start after connection.on so
     // your handlers are registered before any messages are received.
     conn.start()
-        .then(val => console.log(val))
-        .catch(err => console.error(err.toString()));
+        .then(val => {
+          console.log('connection started', val)
+        })
+        .catch(err => {
+          console.error('an error was caught.', err.toString())
+        });
+
+    conn.onclose((error: Error) => {
+      console.log('SignalR connection is closing. ', error);
+    });
 
     this.conn = conn;
     return conn;
