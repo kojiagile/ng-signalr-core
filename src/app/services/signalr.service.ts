@@ -1,3 +1,4 @@
+import { ChatMessage } from './../components/signalr-client/signalr-client.component';
 import { Injectable } from '@angular/core';
 import { LogLevel, HubConnection, HubConnectionBuilder } from '@aspnet/signalr';
 import { isNullOrUndefined } from 'util';
@@ -19,7 +20,8 @@ export class ActionSubjectPair<T> {
 })
 export class SignalrService {
 
-  private actionSubjPairs: any[] = [];
+  // Key: method name Value: An instance of Subject<any>
+  private listenerSubjPairs: {[key: string]: Subject<any>} = {};
   private conn: HubConnection = null;
 
   constructor() { 
@@ -60,15 +62,6 @@ export class SignalrService {
 
   public send<T>(methodName: string, ...args: any[]) {
     
-    // let targetSubj = this.actionSubjPairs[methodName];
-    // if (!targetSubj) {
-    //   // console.log(`${methodName} not found in the pair list. Instanciating...`);
-
-    //   // TODO: Let the caller pass Subject? May want to use different type of Subject..
-    //   targetSubj = new Subject<T>();
-    //   this.actionSubjPairs[methodName] = targetSubj;
-    // }
-
     // TODO: Let the caller pass Subject? May want to use different type of Subject..
     const targetSubj = new Subject<T>();
 
@@ -80,5 +73,46 @@ export class SignalrService {
 
     return targetSubj.asObservable();
   }
+
+  public listen<T>(methodName: string) {
+    
+    let targetSubj = this.listenerSubjPairs[methodName];
+    if (!targetSubj) {
+      targetSubj = new Subject<T>();
+      this.listenerSubjPairs[methodName] = targetSubj;
+    }
+
+    this.conn.on(methodName, (message: T) => {
+      console.log('received: ', message);
+      targetSubj.next(message)
+    });
+
+    return targetSubj.asObservable();
+  }
+
+  // TODO: Implement this
+  // In order to pass multiple parameter to the caller...
+  // public listenRaw(methodName: string) {
+    
+  //   // let targetSubj = this.listenerSubjPairs[methodName];
+  //   // if (!targetSubj) {
+  //   //   targetSubj = new Subject<T>();
+  //   //   this.listenerSubjPairs[methodName] = targetSubj;
+  //   // }
+
+  //   // this.conn.on(str, (...args: any[]) => {
+  //   //   targetSubj.next(args)
+  //   // });
+
+  //   // return subj.asObservable();
+
+  //   /*
+  //     // in a component
+  //     this.listen()
+  //       .subscribe((args: any) => {
+  //         console.log(args[0], args[1]);
+  //       })
+  //   */
+  // }
 
 }
