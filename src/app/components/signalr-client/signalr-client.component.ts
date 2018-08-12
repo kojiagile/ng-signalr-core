@@ -8,6 +8,10 @@ export class ChatMessage {
   public message: string;
 }
 
+export class ChatMessageWithComment extends ChatMessage {
+  public comment: string;
+}
+
 
 @Component({
   selector: 'app-signalr-client',
@@ -41,6 +45,24 @@ export class SignalrClientComponent implements OnInit {
       });
   }
 
+  public sendMessageForComment(): void {
+    
+    this.info = null;
+
+    if (!this.userName || !this.message) {
+      this.info = 'User name and message are required.'
+      return;
+    }
+
+    this.signalrService.send('SendMessageForComment', this.userName, this.message)
+      .subscribe(val => {
+        console.log('Send for comment complete', val);
+        this.userName = null;
+        this.message = null;
+      });
+    
+  }
+
   ngOnInit() {
 
     /*
@@ -57,6 +79,17 @@ export class SignalrClientComponent implements OnInit {
 
         this.messagesList.push(`${chatMessage.userName}: ${chatMessage.message}`);
         this.info = 'Message received.';        
+      });
+
+    this.signalrService.listen<ChatMessageWithComment>('ReceiveMessageWithComment')
+      .subscribe( (msgWithComm: ChatMessageWithComment) => {
+        console.log('Received with comment: ', 
+          msgWithComm.userName, msgWithComm.message, msgWithComm.comment);
+
+        this.messagesList.push(
+          `${msgWithComm.userName}: ${msgWithComm.message}. Comment: ${msgWithComm.comment}`);
+          
+        this.info = 'Message with comment received.';        
       });
 
   }
