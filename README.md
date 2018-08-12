@@ -1,6 +1,7 @@
 # NgSignalrCore
 
-This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 6.1.3.
+This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 6.1.3.  
+This is an ongoing project (started on 12/08/2018) that provides SignalR client wrapper library that utilises @aspnet/signalr TypeScript library.  
 
 ## Development server
 
