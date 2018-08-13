@@ -63,6 +63,10 @@ export class SignalrClientComponent implements OnInit {
     
   }
 
+  public stream() {
+    this.signalrService.listenStream();
+  }
+
   ngOnInit() {
 
     /*
@@ -74,7 +78,7 @@ export class SignalrClientComponent implements OnInit {
     this.signalrService.connect('https://localhost:44315/chatHub', signalR.LogLevel.Debug);
 
     this.signalrService.listen<ChatMessage>('ReceiveMessage')
-      .subscribe( (chatMessage: ChatMessage) => {
+      .subscribe((chatMessage: ChatMessage) => {
         console.log('Received: ', chatMessage.userName, chatMessage.message);
 
         this.messagesList.push(`${chatMessage.userName}: ${chatMessage.message}`);
@@ -82,7 +86,7 @@ export class SignalrClientComponent implements OnInit {
       });
 
     this.signalrService.listen<ChatMessageWithComment>('ReceiveMessageWithComment')
-      .subscribe( (msgWithComm: ChatMessageWithComment) => {
+      .subscribe((msgWithComm: ChatMessageWithComment) => {
         console.log('Received with comment: ', 
           msgWithComm.userName, msgWithComm.message, msgWithComm.comment);
 

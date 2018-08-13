@@ -1,14 +1,7 @@
 import { ChatMessage } from './../components/signalr-client/signalr-client.component';
 import { Injectable } from '@angular/core';
 import { LogLevel, HubConnection, HubConnectionBuilder } from '@aspnet/signalr';
-import { isNullOrUndefined } from 'util';
 import { Subject } from '../../../node_modules/rxjs';
-
-export function isNullEmptyOrUndefined(value: string): boolean {
-  if (isNullOrUndefined(value)) return true;
-  if (value === '') return true;
-  return false;
-}
 
 export class ActionSubjectPair<T> {
   public methodName: string;
@@ -39,12 +32,11 @@ export class SignalrService {
 
   public connect(url: string, logLevel: LogLevel = LogLevel.Information): HubConnection {
 
-    if (isNullEmptyOrUndefined(url)) {
+    if (!url) {
       throw new Error('Url cannot be null, undefined or empty.');
     }
 
     const conn = this.getConnection(url, logLevel);
-
     if (!conn) {
       throw new Error('The service could not get a SignalR connection.');
     }
@@ -54,10 +46,11 @@ export class SignalrService {
     // your handlers are registered before any messages are received.
     conn.start()
         .then(val => {
-          console.log('connection started', val)
+          console.log('connection started', val);
         })
         .catch(err => {
-          console.error('an error was caught.', err.toString())
+          console.error('an error was caught.', err.toString());
+          throw err;
         });
 
     conn.onclose((error: Error) => {
@@ -66,6 +59,30 @@ export class SignalrService {
 
     this.conn = conn;
     return conn;
+  }
+
+  public disconnect() {
+    this.conn.stop()
+      .then(() => {})
+      .catch(err => {
+        console.log('An error occurred while disconnecting it', err)
+      });
+  }
+
+  // https://docs.microsoft.com/en-us/aspnet/core/signalr/streaming?view=aspnetcore-2.1
+  public listenStream(methodName: string, ...args: any[]) {
+    this.conn.stream("Counter", 10, 500)
+    .subscribe({
+        next: (item) => {
+            console.log('next ', item);
+        },
+        complete: () => {
+          console.log('complete');
+        },
+        error: (err) => {
+          console.log('error ', err);
+        },
+    });
   }
 
   public send<T>(methodName: string, ...args: any[]) {
