@@ -1,4 +1,4 @@
-import { SignalrService } from './../../services/signalr.service';
+import { SignalrService, PreferredTransportType } from './../../services/signalr.service';
 import { Component, OnInit, Input } from '@angular/core';
 import { HubConnection, LogLevel } from '@aspnet/signalr';
  import * as signalR from '@aspnet/signalr';
@@ -76,10 +76,7 @@ export class SignalrClientComponent implements OnInit {
     */
     // As a best practice, call connection.start after connection.on so
     // your handlers are registered before any messages are received.
-    this.signalrService.connect(
-      'https://localhost:44315/chatHub', 
-      signalR.LogLevel.Debug,
-      this.onClose)
+    this.signalrService.connect('https://localhost:44315/chatHub',this.onClose)
       .subscribe(() => {
         console.log('SignalR hub connected')
         this.registerListners();
