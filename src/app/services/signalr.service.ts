@@ -1,7 +1,7 @@
 import { ChatMessage } from './../components/signalr-client/signalr-client.component';
 import { Injectable } from '@angular/core';
-import { LogLevel, HubConnection, HubConnectionBuilder } from '@aspnet/signalr';
-import { Subject } from '../../../node_modules/rxjs';
+import { LogLevel, HubConnection, HubConnectionBuilder, HttpTransportType } from '@aspnet/signalr';
+import { Subject, Observable } from '../../../node_modules/rxjs';
 
 export class ActionSubjectPair<T> {
   public methodName: string;
@@ -17,26 +17,27 @@ export class SignalrService {
   private listenerSubjPairs: {[key: string]: Subject<any>} = {};
   private conn: HubConnection = null;
 
-  constructor() { 
+  constructor(private listenStreamSubj: Subject<any>) {}
 
-  }
 
-  private getConnection(url: string, logLevel: LogLevel): HubConnection {
+  private getConnection(url: string, logLevel: LogLevel, protocol: HttpTransportType): HubConnection {
 
     const conn = new HubConnectionBuilder()
-      .withUrl(url)
+      .withUrl(url, protocol)
       .configureLogging(logLevel);
     
     return conn.build();
   }
 
-  public connect(url: string, logLevel: LogLevel = LogLevel.Information): HubConnection {
+  public connect(
+    url: string, logLevel: LogLevel = LogLevel.Information,
+    protocol: HttpTransportType = HttpTransportType.WebSockets): HubConnection {
 
     if (!url) {
       throw new Error('Url cannot be null, undefined or empty.');
     }
 
-    const conn = this.getConnection(url, logLevel);
+    const conn = this.getConnection(url, logLevel, protocol);
     if (!conn) {
       throw new Error('The service could not get a SignalR connection.');
     }
@@ -70,19 +71,22 @@ export class SignalrService {
   }
 
   // https://docs.microsoft.com/en-us/aspnet/core/signalr/streaming?view=aspnetcore-2.1
-  public listenStream(methodName: string, ...args: any[]) {
-    this.conn.stream("Counter", 10, 500)
-    .subscribe({
-        next: (item) => {
-            console.log('next ', item);
-        },
-        complete: () => {
-          console.log('complete');
-        },
-        error: (err) => {
-          console.log('error ', err);
-        },
-    });
+  public listenStream<T>(methodName: string, ...args: any[]): Observable<T> {
+    this.conn.stream<T>(methodName, ...args)
+      .subscribe({
+          next: (item) => {
+            this.listenStreamSubj.next(item);
+          },
+          complete: () => {
+            this.listenStreamSubj.complete();
+          },
+          error: (err) => {
+            console.log('error ', err);
+            this.listenStreamSubj.error(err);
+          }
+      });
+
+    return this.listenStreamSubj.asObservable();
   }
 
   public send<T>(methodName: string, ...args: any[]) {

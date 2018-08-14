@@ -64,7 +64,8 @@ export class SignalrClientComponent implements OnInit {
   }
 
   public stream() {
-    this.signalrService.listenStream();
+    // 2nd param: how many you want to count, 3rd param: delay (milli sec)
+    this.signalrService.listenStream('Counter', 10, 500);
   }
 
   ngOnInit() {
