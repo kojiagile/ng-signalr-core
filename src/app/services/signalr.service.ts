@@ -7,37 +7,79 @@ export class ActionSubjectPair<T> {
   public methodName: string;
   public subj: Subject<T>;
 }
+/*
+ The intention of this enum is not to expose SignalR lib enum.
+ Thought it'd be better if I hide 3rd party lib classes
+ but... is that meaningful?? Not sure..
+ LogLevel (or any other classes) also should be hidden if we do this.
+*/ 
+export enum PreferredTransportType {
+    /** Specifies no transport preference. */
+    None = 0,
+    /** Specifies the WebSockets transport. */
+    WebSockets = 1,
+    /** Specifies the Server-Sent Events transport. */
+    ServerSentEvents = 2,
+    /** Specifies the Long Polling transport. */
+    LongPolling = 4,
+}
+
 
 @Injectable({
   providedIn: 'root'
 })
 export class SignalrService {
 
-  // Key: method name Value: An instance of Subject<any>
-  private listenerSubjPairs: {[key: string]: Subject<any>} = {};
   private conn: HubConnection = null;
+  private connSubj: Subject<void> = new Subject<void>();
+  private listenStreamSubj: Subject<any> = new Subject<any>();
+  
+  // Key: method name Value: An instance of Subject<any>
+  private listenerSubjPairs: {[key: string]: Subject<any>} = {}
 
-  constructor(private listenStreamSubj: Subject<any>) {}
 
+  constructor() {}
 
-  private getConnection(url: string, logLevel: LogLevel, protocol: HttpTransportType): HubConnection {
+  private convertTransportType (type: PreferredTransportType): HttpTransportType {
+    switch (type.valueOf()) {
+      case HttpTransportType.None.valueOf():
+        return HttpTransportType.None;
 
+      case HttpTransportType.WebSockets.valueOf():
+        return HttpTransportType.WebSockets;
+        
+      case HttpTransportType.ServerSentEvents.valueOf():
+        return HttpTransportType.ServerSentEvents;
+
+      case HttpTransportType.LongPolling.valueOf():
+        return HttpTransportType.LongPolling;
+
+      default:
+        return HttpTransportType.None;
+    }
+  }
+
+  private getConnection(url: string, logLevel: LogLevel, type: PreferredTransportType): HubConnection {
+
+    const transportType = this.convertTransportType(type);
     const conn = new HubConnectionBuilder()
-      .withUrl(url, protocol)
+      .withUrl(url, transportType)
       .configureLogging(logLevel);
     
     return conn.build();
   }
-
+  
   public connect(
-    url: string, logLevel: LogLevel = LogLevel.Information,
-    protocol: HttpTransportType = HttpTransportType.WebSockets): HubConnection {
+    url: string, onCloseFunc: any = null, 
+    logLevel: LogLevel = LogLevel.Information,
+    type: PreferredTransportType = PreferredTransportType.WebSockets,
+    ): Observable<void> {
 
     if (!url) {
       throw new Error('Url cannot be null, undefined or empty.');
     }
 
-    const conn = this.getConnection(url, logLevel, protocol);
+    const conn = this.getConnection(url, logLevel, type);
     if (!conn) {
       throw new Error('The service could not get a SignalR connection.');
     }
@@ -46,20 +88,26 @@ export class SignalrService {
     // As a best practice, call connection.start after connection.on so
     // your handlers are registered before any messages are received.
     conn.start()
-        .then(val => {
-          console.log('connection started', val);
+        .then(() => {
+          console.log('connection started');
+          this.connSubj.next();
         })
         .catch(err => {
           console.error('an error was caught.', err.toString());
-          throw err;
+          this.connSubj.error(err);
         });
 
-    conn.onclose((error: Error) => {
-      console.log('SignalR connection is closing. ', error);
-    });
+    this.onClose(onCloseFunc);
 
     this.conn = conn;
-    return conn;
+
+    return this.connSubj.asObservable();
+  }
+
+  public onClose(func: any): void{
+    if (func) {
+      this.conn.onclose(func);
+    }
   }
 
   public disconnect() {
@@ -81,7 +129,7 @@ export class SignalrService {
             this.listenStreamSubj.complete();
           },
           error: (err) => {
-            console.log('error ', err);
+            console.log('Error logged in listenStream()', err);
             this.listenStreamSubj.error(err);
           }
       });
@@ -98,7 +146,9 @@ export class SignalrService {
       .then(val => {
         targetSubj.next(val);
       })
-      .catch(err => { throw err; });
+      .catch(err => { 
+        targetSubj.error(err);
+       });
 
     return targetSubj.asObservable();
   }

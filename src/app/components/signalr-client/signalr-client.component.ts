@@ -76,7 +76,20 @@ export class SignalrClientComponent implements OnInit {
     */
     // As a best practice, call connection.start after connection.on so
     // your handlers are registered before any messages are received.
-    this.signalrService.connect('https://localhost:44315/chatHub', signalR.LogLevel.Debug);
+    this.signalrService.connect(
+      'https://localhost:44315/chatHub', 
+      signalR.LogLevel.Debug,
+      this.onClose)
+      .subscribe(() => {
+        console.log('SignalR hub connected')
+        this.registerListners();
+      }, 
+      err => {
+        console.log('Error occurred. Could not get a SignalR connection. ', err);
+      });
+  }
+
+  private registerListners() {
 
     this.signalrService.listen<ChatMessage>('ReceiveMessage')
       .subscribe((chatMessage: ChatMessage) => {
@@ -96,6 +109,10 @@ export class SignalrClientComponent implements OnInit {
           
         this.info = 'Message with comment received.';        
       });
+
+  }
+
+  private onClose() {
 
   }
 
