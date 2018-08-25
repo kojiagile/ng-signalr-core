@@ -1,7 +1,5 @@
 import { SignalrService, PreferredTransportType } from './../../services/signalr.service';
 import { Component, OnInit, Input } from '@angular/core';
-import { HubConnection, LogLevel } from '@aspnet/signalr';
- import * as signalR from '@aspnet/signalr';
 
 export class ChatMessage {
   public userName: string;
@@ -38,6 +36,7 @@ export class SignalrClientComponent implements OnInit {
     }
 
     this.signalrService.send('SendMessage', this.userName, this.message)
+    
       .subscribe(val => {
         console.log('Send complete', val);
         this.userName = null;
@@ -46,7 +45,6 @@ export class SignalrClientComponent implements OnInit {
   }
 
   public sendMessageForComment(): void {
-    
     this.info = null;
 
     if (!this.userName || !this.message) {
@@ -76,7 +74,7 @@ export class SignalrClientComponent implements OnInit {
     */
     // As a best practice, call connection.start after connection.on so
     // your handlers are registered before any messages are received.
-    this.signalrService.connect('https://localhost:44315/chatHub',this.onClose)
+    this.signalrService.connect('https://localhost:44315/chatHub')
       .subscribe(() => {
         console.log('SignalR hub connected')
         this.registerListners();
@@ -84,7 +82,14 @@ export class SignalrClientComponent implements OnInit {
       err => {
         console.log('Error occurred. Could not get a SignalR connection. ', err);
       });
+
+    this.signalrService.onClose()
+      .subscribe(error => {
+        console.log('SignalR connection was closed. Error: ', error);
+      });
   }
+
+
 
   private registerListners() {
 

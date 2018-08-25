@@ -1,38 +1,44 @@
-import { ChatMessage } from './../components/signalr-client/signalr-client.component';
-import { Injectable } from '@angular/core';
+import { Injectable, OnDestroy } from '@angular/core';
 import { LogLevel, HubConnection, HubConnectionBuilder, HttpTransportType } from '@aspnet/signalr';
-import { Subject, Observable } from '../../../node_modules/rxjs';
+import { Subject, Observable, interval } from '../../../node_modules/rxjs';
 
-export class ActionSubjectPair<T> {
-  public methodName: string;
-  public subj: Subject<T>;
-}
-/*
- The intention of this enum is not to expose SignalR lib enum.
- Thought it'd be better if I hide 3rd party lib classes
- but... is that meaningful?? Not sure..
- LogLevel (or any other classes) also should be hidden if we do this.
-*/ 
-export enum PreferredTransportType {
-    /** Specifies no transport preference. */
-    None = 0,
-    /** Specifies the WebSockets transport. */
-    WebSockets = 1,
-    /** Specifies the Server-Sent Events transport. */
-    ServerSentEvents = 2,
-    /** Specifies the Long Polling transport. */
-    LongPolling = 4,
+export class HubConnectionInfo {
+  public url: string;
+  public logLevel: LogLevel = LogLevel.Information;
+  public type: HttpTransportType = HttpTransportType.WebSockets;
+
 }
 
+// /*
+//  The intention of this enum is not to expose SignalR lib enum.
+//  Thought it'd be better if I hide 3rd party lib classes
+//  but... is that meaningful?? Not sure..
+//  LogLevel (or any other classes) also should be hidden if we do this.
+// */ 
+// export enum PreferredTransportType {
+//     /** Specifies no transport preference. */
+//     None = 0,
+//     /** Specifies the WebSockets transport. */
+//     WebSockets = 1,
+//     /** Specifies the Server-Sent Events transport. */
+//     ServerSentEvents = 2,
+//     /** Specifies the Long Polling transport. */
+//     LongPolling = 4,
+// }
+
+// SignalR client library made by Microsoft:
+// https://docs.microsoft.com/en-gb/javascript/api/@aspnet/signalr/?view=signalr-js-latest
 
 @Injectable({
   providedIn: 'root'
 })
-export class SignalrService {
+export class SignalrService implements OnDestroy {
 
   private conn: HubConnection = null;
   private connSubj: Subject<void> = new Subject<void>();
+  private connCloseSubj: Subject<any> = new Subject<any>();
   private listenStreamSubj: Subject<any> = new Subject<any>();
+  private connInfo: HubConnectionInfo;
   
   // Key: method name Value: An instance of Subject<any>
   private listenerSubjPairs: {[key: string]: Subject<any>} = {}
@@ -40,49 +46,77 @@ export class SignalrService {
 
   constructor() {}
 
-  private convertTransportType (type: PreferredTransportType): HttpTransportType {
-    switch (type.valueOf()) {
-      case HttpTransportType.None.valueOf():
-        return HttpTransportType.None;
+  // private convertTransportType (type: PreferredTransportType): HttpTransportType {
+  //   switch (type.valueOf()) {
+  //     case HttpTransportType.None.valueOf():
+  //       return HttpTransportType.None;
 
-      case HttpTransportType.WebSockets.valueOf():
-        return HttpTransportType.WebSockets;
+  //     case HttpTransportType.WebSockets.valueOf():
+  //       return HttpTransportType.WebSockets;
         
-      case HttpTransportType.ServerSentEvents.valueOf():
-        return HttpTransportType.ServerSentEvents;
+  //     case HttpTransportType.ServerSentEvents.valueOf():
+  //       return HttpTransportType.ServerSentEvents;
 
-      case HttpTransportType.LongPolling.valueOf():
-        return HttpTransportType.LongPolling;
+  //     case HttpTransportType.LongPolling.valueOf():
+  //       return HttpTransportType.LongPolling;
 
-      default:
-        return HttpTransportType.None;
-    }
-  }
+  //     default:
+  //       return HttpTransportType.None;
+  //   }
+  // }
 
-  private getConnection(url: string, logLevel: LogLevel, type: PreferredTransportType): HubConnection {
+  ngOnDestroy(): void {
+    this.disconnect();
 
-    const transportType = this.convertTransportType(type);
-    const conn = new HubConnectionBuilder()
-      .withUrl(url, transportType)
-      .configureLogging(logLevel);
-    
-    return conn.build();
+    // TODO: Use an array, push these into it, then use subscriptions.forEach()
+    // See details: https://stackoverflow.com/questions/45898948/angular-4-ngondestroy-in-service-destroy-observable/45898988
+    this.connSubj.complete();
+    this.connSubj.unsubscribe();
+    this.connCloseSubj.complete();
+    this.connCloseSubj.unsubscribe();
+    this.listenStreamSubj.complete();
+    this.listenStreamSubj.unsubscribe();
+
   }
   
+  private getConnection(connInfo: HubConnectionInfo) {
+    this.connInfo = connInfo;
+    
+    // const transportType = this.convertTransportType(type);
+    const connBuilder = new HubConnectionBuilder()
+      .withUrl(connInfo.url, connInfo.type)
+      .configureLogging(connInfo.logLevel);
+
+    return connBuilder.build();
+  }
+
   public connect(
-    url: string, onCloseFunc: any = null, 
+    url: string, 
     logLevel: LogLevel = LogLevel.Information,
-    type: PreferredTransportType = PreferredTransportType.WebSockets,
+    type: HttpTransportType = HttpTransportType.WebSockets,
     ): Observable<void> {
 
     if (!url) {
       throw new Error('Url cannot be null, undefined or empty.');
     }
 
-    const conn = this.getConnection(url, logLevel, type);
+    const connInfo = new HubConnectionInfo();
+    connInfo.url = url;
+    connInfo.logLevel = logLevel;
+    connInfo.type = type;
+
+    const conn = this.getConnection(connInfo);
     if (!conn) {
       throw new Error('The service could not get a SignalR connection.');
     }
+
+    this.start(conn);
+    this.conn = conn;
+
+    return this.connSubj.asObservable();
+  }
+
+  private start(conn: HubConnection) {
 
     // TODO: return Observable with conn
     // As a best practice, call connection.start after connection.on so
@@ -96,18 +130,40 @@ export class SignalrService {
           console.error('an error was caught.', err.toString());
           this.connSubj.error(err);
         });
-
-    this.onClose(onCloseFunc);
-
-    this.conn = conn;
-
-    return this.connSubj.asObservable();
   }
 
-  public onClose(func: any): void{
-    if (func) {
-      this.conn.onclose(func);
+  public onClose(): Observable<any> {
+    if (!this.conn) {
+      throw new Error('SignalR connection not found.');
     }
+
+    this.conn.onclose(error => {
+      this.connCloseSubj.next(error);
+    });
+
+    return this.connCloseSubj.asObservable();
+  }
+
+  private reConnect() {
+    const retryCount: number = 0;
+    const maxRetryCount: number = 10;
+
+    // while (!this.conn && retryCount < maxRetryCount) {
+      
+      const retryCounter = interval(1000);
+      const sub = retryCounter.subscribe(n => {
+        console.log(`It's been ${n} seconds since subscribing!`);
+        this.connect(this.connInfo.url, this.connInfo.logLevel, this.connInfo.type)
+          
+          .subscribe(
+            () => {
+              
+            }, error => {
+
+            });
+      });
+    // }
+
   }
 
   public disconnect() {
