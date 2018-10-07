@@ -1,4 +1,4 @@
-import { SignalrService, PreferredTransportType } from './../../services/signalr.service';
+import { SignalrService } from './../../services/signalr.service';
 import { Component, OnInit, Input } from '@angular/core';
 
 export class ChatMessage {
